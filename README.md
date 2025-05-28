@@ -51,7 +51,7 @@ location ~ /(.*) {
 
 ## 再次确认
 
-1. 确保所有文件（config.php、index.php、redirect.php 和 <code><del>short_urls.sql</del></code>）已上传到你的网站根目录。
+1. 确保所有文件（config.php、index.php、redirect.php 和 <del> short_urls.sql</del>）已上传到你的网站根目录。
 2. 在浏览器中访问你的域名，确保网站可以正常加载。
 3. 尝试生成一个短网址，检查是否能够正常重定向。
 
@@ -67,7 +67,9 @@ V1.0.2：限制后缀仅可使用数字和字母，每个长网址最多可生�
 V1.0.3：简化部署流程，无需手动导入数据库文件，进一步提升部署便捷性。
 
 
-其实上面这些是瞎写的  凑合着看吧 ![017EE462](https://github.com/user-attachments/assets/fcb68fa5-880a-46f9-bd37-f920cd0bf5de)
+其实上面这些是瞎写的  凑合着看吧 ![000932FB](https://github.com/user-attachments/assets/846a9a36-7923-4aef-adfc-8851eafe1f85)
+
+
 
 
 
