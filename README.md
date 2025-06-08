@@ -9,6 +9,10 @@
  * **Tags**: 短网址，高效，稳定，安全，用户友好
 
 
+![Alt](https://repobeats.axiom.co/api/embed/58cb53d65d230410f5788081beed17fc08dff11f.svg "Repobeats analytics image")
+
+
+
 ## 程序演示
 
 ### 主界面展示
