@@ -5,13 +5,14 @@
  * Official Website: http://www.xsjya.com/
  * Description: 一个高效、稳定、安全的短网址程序，帮助您轻松管理和共享网址！
  * Tags: 短网址，高效，稳定，安全，用户友好
- * Version: 1.0
+ * Version: 1.0.3
  */
 require_once 'config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['long_url'])) {
     $longUrl = $_POST['long_url'];
     $customSuffix = isset($_POST['custom_suffix']) ? trim($_POST['custom_suffix']) : null;
+    $expiresIn = isset($_POST['expires_in']) ? trim($_POST['expires_in']) : null;
 
     try {
         // 如果用户提供了自定义后缀，检查是否符合要求
@@ -36,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['long_url'])) {
 
         // 如果没有提供自定义后缀，则自动生成一个
         if ($customSuffix === null || $customSuffix === '') {
-            $customSuffix = generateRandomSuffix();
+            $customSuffix = generateShortUrl($pdo);
         }
 
         // 检查是否已生成过多短网址
@@ -55,23 +56,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['long_url'])) {
         }
 
         // 创建短网址
-        $result = createShortUrl($pdo, $longUrl, $customSuffix);
+        $result = createShortUrl($pdo, $longUrl, $customSuffix, $expiresIn);
         echo json_encode(['shortUrl' => $result['shortUrl']]);
         exit;
     } catch (PDOException $e) {
         echo json_encode(['error' => '数据库操作失败: ' . $e->getMessage()]);
         exit;
     }
-}
-
-// 自动生成一个随机后缀的函数
-function generateRandomSuffix($length = 6) {
-    $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    $randomString = '';
-    for ($i = 0; $i < $length; $i++) {
-        $randomString .= $characters[rand(0, strlen($characters) - 1)];
-    }
-    return $randomString;
 }
 ?>
 
@@ -148,9 +139,18 @@ function generateRandomSuffix($length = 6) {
         .footer a:hover {
             text-decoration: none;
         }
-        .custom-suffix-group {
+        .advanced-options {
             display: none;
             margin-top: 10px;
+        }
+        .advanced-options .left, .advanced-options .right {
+            width: 48%; /* 让输入框变小 */
+        }
+        .advanced-options .left {
+            float: left;
+        }
+        .advanced-options .right {
+            float: right;
         }
         @media (max-width: 768px) {
             .result p {
@@ -172,23 +172,27 @@ function generateRandomSuffix($length = 6) {
         <form id="urlForm">
             <div class="form-group">
                 <label for="long_url">请输入要缩短的链接（包含 http:// 或 https://）：</label>
-                <input type="text" class="form-control" id="long_url" name="long_url" required>
+                <input type="text" class="form-control" id="long_url" name="long_url" required="自定义后缀">
             </div>
-            <div class="custom-suffix-group">
-                <div class="form-group">
-                    <label for="custom_suffix">请输入自定义后缀（可选）：</label>
-                    <input type="text" class="form-control" id="custom_suffix" name="custom_suffix">
+            <div class="advanced-options">
+                <div class="form-group left">
+                    <label for="custom_suffix">自定义后缀（可选）：</label>
+                    <input type="text" class="form-control" id="custom_suffix" name="custom_suffix" placeholder="自定义后缀">
+                </div>
+                <div class="form-group right">
+                    <label for="expires_in">有效期 /天：</label>
+                    <input type="text" class="form-control" id="expires_in" name="expires_in" placeholder="留空默认不过期">
                 </div>
             </div>
             <button type="submit" class="btn btn-primary">生成短网址</button>
         </form>
         <div class="result" id="result"></div>
-    </div>
-    <div class="footer">
-        <p>
-            © <span onclick="toggleCustomSuffix()" style="cursor: pointer;">2025</span>
-            <a href="https://www.xsjya.com/" target="_blank">XSJYA</a>. All rights reserved.
-        </p>
+        <div class="footer">
+            <p>
+                © <span id="toggleAdvanced" style="cursor: pointer;">2025</span>
+                <a href="https://www.xsjya.com/" target="_blank">XSJYA</a>. All rights reserved.
+            </p>
+        </div>
     </div>
 
     <!-- jQuery -->
@@ -198,10 +202,26 @@ function generateRandomSuffix($length = 6) {
     <!-- Bootstrap JS -->
     <script src="https://cdn.staticfile.org/twitter-bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
+        // 修复点击功能 - 使用纯JavaScript确保可靠
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleElement = document.getElementById('toggleAdvanced');
+            const advancedOptions = document.querySelector('.advanced-options');
+            
+            toggleElement.addEventListener('click', function() {
+                // 直接切换显示状态
+                if (advancedOptions.style.display === 'none') {
+                    advancedOptions.style.display = 'block';
+                } else {
+                    advancedOptions.style.display = 'none';
+                }
+            });
+        });
+
         document.getElementById('urlForm').addEventListener('submit', function(event) {
             event.preventDefault();
             const longUrl = document.getElementById('long_url').value;
             const customSuffix = document.getElementById('custom_suffix') ? document.getElementById('custom_suffix').value : '';
+            const expiresIn = document.getElementById('expires_in') ? document.getElementById('expires_in').value : '';
             const resultDiv = document.getElementById('result');
             resultDiv.innerHTML = '<p>正在生成...</p>';
 
@@ -210,7 +230,7 @@ function generateRandomSuffix($length = 6) {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: `long_url=${encodeURIComponent(longUrl)}&custom_suffix=${encodeURIComponent(customSuffix)}`
+                body: `long_url=${encodeURIComponent(longUrl)}&custom_suffix=${encodeURIComponent(customSuffix)}&expires_in=${encodeURIComponent(expiresIn)}`
             })
                 .then(response => response.json())
                 .then(data => {
@@ -248,15 +268,6 @@ function generateRandomSuffix($length = 6) {
             }, function(err) {
                 console.error('无法复制文本：', err);
             });
-        }
-
-        function toggleCustomSuffix() {
-            const customSuffixGroup = document.querySelector('.custom-suffix-group');
-            if (customSuffixGroup.style.display === 'none') {
-                customSuffixGroup.style.display = 'block';
-            } else {
-                customSuffixGroup.style.display = 'none';
-            }
         }
     </script>
 </body>
