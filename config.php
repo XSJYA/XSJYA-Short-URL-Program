@@ -5,8 +5,9 @@
  * Official Website: http://www.xsjya.com/
  * Description: 一个高效、稳定、安全的短网址程序，帮助您轻松管理和共享网址！
  * Tags: 短网址，高效，稳定，安全，用户友好
- * Version: 1.0.3  简化部署流程 
+ * Version: 1.0.5  添加短网址有效期 到期以后三天后释后缀 可再次申请
  */
+
 // 数据库配置
 $host = 'localhost'; // 数据库主机
 $dbname = 'XSJYA'; // 数据库名称
@@ -37,9 +38,11 @@ try {
     $sql = <<<SQL
 CREATE TABLE IF NOT EXISTS short_urls (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    short_url VARCHAR(255) NOT NULL UNIQUE,
+    short_url VARCHAR(191) NOT NULL UNIQUE, -- 修改字段长度为 191
     long_url TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME,
+    available_at DATETIME
 );
 SQL;
     $pdo->exec($sql);
@@ -66,13 +69,13 @@ function generateShortUrl($pdo) {
     return $shortUrl;
 }
 
-function createShortUrl($pdo, $longUrl, $customSuffix = null) {
+function createShortUrl($pdo, $longUrl, $customSuffix = null, $expiresIn = null) {
     global $base_url;
 
     $shortUrl = '';
 
     // 如果提供了自定义后缀
-    if ($customSuffix !== null) {
+    if ($customSuffix !== null && $customSuffix !== '') {
         // 检查自定义后缀是否符合要求
         if (!preg_match('/^[a-zA-Z0-9]+$/', $customSuffix)) {
             return ['error' => '自定义后缀只能包含字母和数字，请重新输入。'];
@@ -97,9 +100,28 @@ function createShortUrl($pdo, $longUrl, $customSuffix = null) {
 
     $longUrl = ensureProtocol($longUrl);
 
+    // 设置过期时间和可用时间
+    $expiresAt = null;
+    $availableAt = null;
+    if ($expiresIn !== null && is_numeric($expiresIn) && $expiresIn > 0) {
+        $expiresAt = date('Y-m-d H:i:s', strtotime("+$expiresIn days"));
+        $availableAt = date('Y-m-d H:i:s', strtotime("+$expiresIn days +3 days")); // 3天后释放
+    }
+
     // 插入新的短网址记录
-    $stmt = $pdo->prepare("INSERT INTO short_urls (short_url, long_url) VALUES (:short_url, :long_url)");
-    $stmt->execute(['short_url' => $shortUrl, 'long_url' => $longUrl]);
+    $stmt = $pdo->prepare("INSERT INTO short_urls (short_url, long_url, expires_at, available_at) VALUES (:short_url, :long_url, :expires_at, :available_at)");
+    $stmt->execute([
+        'short_url' => $shortUrl,
+        'long_url' => $longUrl,
+        'expires_at' => $expiresAt,
+        'available_at' => $availableAt
+    ]);
 
     return ['shortUrl' => $base_url . $shortUrl];
+}
+
+// 删除过期的短网址
+function deleteExpiredShortUrls($pdo) {
+    $stmt = $pdo->prepare("DELETE FROM short_urls WHERE available_at < :current_time");
+    $stmt->execute(['current_time' => date('Y-m-d H:i:s')]);
 }
